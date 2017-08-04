@@ -1,0 +1,6 @@
+{
+    "uid": "nxt-api-server",
+    "append": "true",
+    "watch": true,
+    "script": "./dist/index.js"
+}

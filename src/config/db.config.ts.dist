@@ -1,0 +1,8 @@
+export const dbConfig = {
+    database: 'node_application',
+    driver: 'mysql',
+    host: 'localhost',
+    password: 'root',
+    port: 3306,
+    user: 'root',
+}

@@ -1,0 +1,4 @@
+export const appConfig = {
+    environment: 'development', // (development|production)
+    port: 1333,
+}
