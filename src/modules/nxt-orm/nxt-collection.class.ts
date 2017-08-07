@@ -7,7 +7,17 @@ export class NxtCollectionClass<T extends NxtEntityClass> {
         public currentPage: number = 0,
         public nbPages: number = 0,
         public itemsPerPage: number = 0,
-        public list: T[] = null,
+        public list: T[] = [],
     ) {}
+
+    public getObjectToSend (): any {
+        return {
+            currentPage: this.currentPage,
+            itemsPerPage: this.itemsPerPage,
+            list: this.list.map((row: NxtEntityClass) => row.getObjectToSend()),
+            nbPages: this.nbPages,
+            nbTotal: this.nbTotal,
+        }
+    }
 
 }

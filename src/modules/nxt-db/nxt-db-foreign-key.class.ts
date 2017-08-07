@@ -18,11 +18,11 @@ export class NxtDbForeignKey implements INxtDbTableElement {
         this.onUpdate = onUpdate
     }
 
-    public toSQLString () {
+    public toSQLString (): string {
         return `    ${this.getAddSQLString()}`
     }
 
-    public getAddSQLString () {
+    public getAddSQLString (): string {
         const onDelete: string = this.getReferenceOption(this.onDelete)
         const onUpdate: string = this.getReferenceOption(this.onUpdate)
 

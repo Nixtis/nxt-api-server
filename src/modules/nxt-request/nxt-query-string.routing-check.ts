@@ -1,8 +1,9 @@
 import { NextFunction, Request, Response } from 'express'
 
+import { NxtInjectClass } from '../nxt-inject'
 import { NxtQueryStringTypesEnum, NxtRouteParams } from '../nxt-request'
 
-export function nxtQueryStringRoutingCheck (req: Request, res: Response, next: NextFunction, routeParams: NxtRouteParams): Promise<boolean> {
+export function nxtQueryStringRoutingCheck (req: Request, res: Response, next: NextFunction, routeParams: NxtRouteParams, nxtInject: NxtInjectClass): Promise<boolean> {
     /**
      * Check for query string type validity
      */

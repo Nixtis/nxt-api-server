@@ -120,9 +120,7 @@ export class NxtDbCreateTable implements INxtDbQuery {
                 if (!err) {
                     resolve(rows)
                 } else {
-                    reject()
-
-                    throw new Error(err)
+                    reject(err)
                 }
             })
         })

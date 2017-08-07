@@ -1,4 +1,5 @@
 import * as NxtRequest from '../nxt-request'
+import { NxtCollectionClass } from './nxt-collection.class'
 import { NxtField } from './nxt-field.decorator'
 import { NxtOrmEnum } from './nxt-orm.enum'
 
@@ -21,13 +22,7 @@ export class NxtEntityClass {
 
         Object.getOwnPropertyNames(this).forEach((prop: string) => {
             if (this._ignored.indexOf(prop) === -1) {
-                if (this[prop] instanceof NxtEntityClass) {
-                    props[prop] = this[prop].getProps()
-                } else if (Array.isArray(this[prop])) {
-                    props[prop] = this[prop].map((row) => row instanceof NxtEntityClass ? row.getProps() : row)
-                } else {
-                    props[prop] = this[prop]
-                }
+                props[prop] = this[prop]
             }
         })
 
@@ -41,7 +36,9 @@ export class NxtEntityClass {
             if (this._dontShow.indexOf(prop) === -1) {
                 if (this[prop] instanceof NxtEntityClass) {
                     obj[prop] = this[prop].getObjectToSend()
-                } else if (Array.isArray(this[prop])) {
+                } else if (this[prop] instanceof NxtCollectionClass) {
+                    obj[prop] = this[prop].getObjectToSend()
+                }  else if (Array.isArray(this[prop])) {
                     obj[prop] = this[prop].map((row) => row instanceof NxtEntityClass ? row.getObjectToSend() : row)
                 } else {
                     obj[prop] = this[prop]

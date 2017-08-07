@@ -25,7 +25,7 @@ export class NxtDbIndex implements INxtDbTableElement {
      * Retourne la requête au format string SQL pour l'ALTER TABLE ADD
      * @returns {string}
      */
-    public getAddSQLString () {
+    public getAddSQLString (): string {
         const columnsString: string[] = this.columns.map((col: NxtDbColumn) => col.name)
 
         return NxtDbDrivers.NxtDbDriver.format(`${this.getTypeSQLString()} (??)`, [ columnsString ])

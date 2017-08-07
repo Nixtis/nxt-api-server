@@ -83,16 +83,19 @@ export class NxtDbAlterTable implements INxtDbQuery {
      * @returns {Promise<any>}
      */
     public execute (): Promise<any> {
-        const sqlString: string = this.toSQLString()
+        let sqlString: string = ''
+        try {
+            sqlString = this.toSQLString()
+        } catch (e) {
+            return Promise.reject(e)
+        }
 
         return new Promise((resolve, reject) => {
             this.db.query(sqlString, (err, rows) => {
                 if (!err) {
                     resolve(rows)
                 } else {
-                    reject()
-
-                    throw new Error(err)
+                    reject(err)
                 }
             })
         })

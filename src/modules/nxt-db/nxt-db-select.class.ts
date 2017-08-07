@@ -186,12 +186,17 @@ export class NxtDbSelect implements INxtDbQuery {
      */
     public getTotalRows (): Promise<number> {
         let sqlString: string = NxtDbDrivers.NxtDbDriver.format('SELECT COUNT(*) as ??', [ 'total_rows' ])
-        sqlString += this.getFrom()
-        sqlString += this.getJoinSQLString()
-        sqlString += this.getWhereSQLString()
-        sqlString += this.getGroupBy()
-        sqlString += this.getOrder()
-        sqlString += this.getLimit()
+
+        try {
+            sqlString += this.getFrom()
+            sqlString += this.getJoinSQLString()
+            sqlString += this.getWhereSQLString()
+            sqlString += this.getGroupBy()
+            sqlString += this.getOrder()
+            sqlString += this.getLimit()
+        } catch (e) {
+            return Promise.reject(e)
+        }
 
         return new Promise((resolve, reject) => {
             this.db.query(NxtDbDrivers.NxtDbDriver.format(sqlString, this.getVals()), (err, rows) => {
@@ -202,9 +207,7 @@ export class NxtDbSelect implements INxtDbQuery {
                         resolve(parseInt(rows.rows[0]['total_rows'], 10))
                     }
                 } else {
-                    reject()
-
-                    throw new Error('[SQL_ERROR: ' + err.code + ']: ' + err.message)
+                    reject(err)
                 }
             })
         })
@@ -215,7 +218,13 @@ export class NxtDbSelect implements INxtDbQuery {
      * @returns {Promise<any>}
      */
     public execute (): Promise<any> {
-        const sqlString: string = this.toSQLString()
+        let sqlString: string = this.toSQLString()
+
+        try {
+            sqlString = this.toSQLString()
+        } catch (e) {
+            return Promise.reject(e)
+        }
 
         return new Promise((resolve, reject) => {
             this.db.query(sqlString, (err, rows) => {
@@ -226,9 +235,7 @@ export class NxtDbSelect implements INxtDbQuery {
                         resolve(rows.rows)
                     }
                 } else {
-                    reject()
-
-                    throw new Error('[SQL_ERROR: ' + err.code + ']: ' + err.message)
+                    reject(err)
                 }
             })
         })

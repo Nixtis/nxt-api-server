@@ -3,19 +3,29 @@ import * as passwordHash from 'password-hash'
 import * as uuid from 'uuid'
 
 import { security } from '../../config/security'
-import { NxtResponse } from '../../modules/nxt-request'
 import { NxtDbColumnValuePair } from '../nxt-db'
-import * as NxtOrm from '../nxt-orm'
+import { NxtInject } from '../nxt-inject/nxt-inject.decorator'
+import { NxtCollectionClass } from '../nxt-orm/nxt-collection.class'
+import { NxtOrmRepository } from '../nxt-orm/nxt-orm-repository.class'
+import { NxtOrm } from '../nxt-orm/nxt-orm.class'
+import { NxtResponse } from '../nxt-request'
 import * as NxtValidation from '../nxt-validation'
 import { NxtOauthClient } from './nxt-oauth2-client.entity'
 import { NxtOauthRefreshToken } from './nxt-oauth2-refresh-token.entity'
 import { NxtOauthToken } from './nxt-oauth2-token.entity'
 import { NxtOauthUser } from './nxt-oauth2-user.entity'
 
+@NxtInject([
+    NxtOrm,
+])
 export class NxtOauth2 {
-    private orm: NxtOrm.NxtOrm = new NxtOrm.NxtOrm()
+
     private tokenExpiresIn: number = 3600
     private refreshTokenExpiresIn: number = 1209600
+
+    constructor (
+        private orm: NxtOrm,
+    ) {}
 
     /**
      * Returns the current user
@@ -27,7 +37,7 @@ export class NxtOauth2 {
             const token: string = req.header('authorization').substr(7)
 
             return this.orm.getRepository(NxtOauthToken).findBy([ { column: 'token', value: token } ])
-                .then((results: NxtOrm.NxtCollectionClass<NxtOauthToken>) => {
+                .then((results: NxtCollectionClass<NxtOauthToken>) => {
                     if (results.nbTotal) {
                         const now: Date = new Date()
                         return now.getTime() <= results.list[0].tokenExpires.getTime() ? results.list[0].user : null
@@ -64,7 +74,7 @@ export class NxtOauth2 {
      */
     public checkCretentials (username: string, password: string): Promise<NxtOauthUser> {
         return this.orm.getRepository(NxtOauthUser).findBy([ { column: 'username', value: username } ])
-            .then((results: NxtOrm.NxtCollectionClass<NxtOauthUser>) => {
+            .then((results: NxtCollectionClass<NxtOauthUser>) => {
                 if (results.nbTotal && passwordHash.verify(password, results.list[0].password)) {
                     return results.list[0]
                 }
@@ -86,7 +96,7 @@ export class NxtOauth2 {
         ]
 
         return this.orm.getRepository(NxtOauthClient).findBy(nxtDbColumnValuePair)
-            .then((results: NxtOrm.NxtCollectionClass<NxtOauthClient>) => {
+            .then((results: NxtCollectionClass<NxtOauthClient>) => {
                 if (results.nbTotal && results.list[0].allowedGrantTypes.indexOf(grantType) > -1) {
                     return results.list[0]
                 }
@@ -106,7 +116,7 @@ export class NxtOauth2 {
         ]
 
         return this.orm.getRepository(NxtOauthRefreshToken).findBy(nxtDbColumnValuePair)
-            .then((results: NxtOrm.NxtCollectionClass<NxtOauthRefreshToken>) => {
+            .then((results: NxtCollectionClass<NxtOauthRefreshToken>) => {
                 if (results.nbTotal) {
                     const now: Date = new Date()
                     return now.getTime() <= results.list[0].refreshTokenExpires.getTime() ? results.list[0] : null
@@ -185,11 +195,11 @@ export class NxtOauth2 {
 
         user.password = passwordHash.generate(password)
 
-        const repository: NxtOrm.NxtOrmRepository<NxtOauthUser> = this.orm.getRepository<NxtOauthUser>(NxtOauthUser)
+        const repository: NxtOrmRepository<NxtOauthUser> = this.orm.getRepository<NxtOauthUser>(NxtOauthUser)
 
         return repository
             .findBy([ { column: 'username', value: username } ])
-            .then((oauthUser: NxtOrm.NxtCollectionClass<NxtOauthUser>) => {
+            .then((oauthUser: NxtCollectionClass<NxtOauthUser>) => {
                 if (oauthUser.nbTotal) {
                     oauthUser.list[0]._response = new NxtResponse(NxtResponse.HTTP_CONFLICT, {
                         details: 'Username already exists',
@@ -335,4 +345,5 @@ export class NxtOauth2 {
     public isGoodRequest (body: any): boolean {
         return body.grant_type && body.client_secret && body.client_id && ((body.grant_type === 'password' && body.password && body.username) || (body.grant_type === 'refresh_token' && body.refresh_token))
     }
+
 }

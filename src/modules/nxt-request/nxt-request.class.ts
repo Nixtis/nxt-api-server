@@ -2,6 +2,8 @@ import { Application, NextFunction, Request, Response, Router } from 'express'
 
 import { Route } from '../../config/routes'
 import * as NxtRoutingCheck from '../../config/routing-checks'
+import * as NxtInject from '../nxt-inject'
+import { injectableModules } from '../nxt-inject/nxt-injectable-modules'
 import * as NxtOrm from '../nxt-orm'
 import { NxtRequestEnum } from './nxt-request.enum'
 import { NxtResponse } from './nxt-response.class'
@@ -9,13 +11,15 @@ import { nxtGetRoute, NxtRouteParams } from './nxt-route.decorator'
 
 export class NxtRequest {
     private express: Application
-    private routes: NxtUsedRoute[]= []
+    private routes: NxtUsedRoute[] = []
+    private nxtInject: NxtInject.NxtInjectClass =  new NxtInject.NxtInjectClass(injectableModules)
 
     constructor (routes: Route[], express: Application) {
         this.express = express
 
         routes.forEach((route) => {
-            const entity = new route.service()
+            // Instancie les service en injectant les modules
+            const entity = this.nxtInject.createInstance(route.service)
             const router: Router = Router()
 
             Object.getOwnPropertyNames(entity.__proto__).forEach((prop: string) => {
@@ -56,7 +60,7 @@ export class NxtRequest {
     }
 
     private routingCheck (props: string[], req: Request, res: Response, next: NextFunction, routeParams: NxtRouteParams): Promise<boolean> {
-        return NxtRoutingCheck[props[0]](req, res, next, routeParams)
+        return NxtRoutingCheck[props[0]](req, res, next, routeParams, this.nxtInject)
             .then((value: boolean) => {
                 if (!value) {
                     return false
@@ -84,7 +88,7 @@ export class NxtRequest {
                 }
             })
             .catch((err) => {
-                console.log(err)
+                console.error(err)
 
                 res
                     .status(NxtResponse.HTTP_INTERNAL_SERVER_ERROR)
@@ -105,7 +109,7 @@ export class NxtRequest {
                     .send(respToSend.getBody())
             })
             .catch((err) => {
-                console.log(err)
+                console.error(err)
 
                 res
                     .status(NxtResponse.HTTP_INTERNAL_SERVER_ERROR)
@@ -136,13 +140,7 @@ export class NxtRequest {
                 respToSend = new NxtResponse(200, resp.getObjectToSend())
             }
         } else if (resp instanceof NxtOrm.NxtCollectionClass) {
-            respToSend = new NxtResponse(200, {
-                currentPage: resp.currentPage,
-                itemsPerPage: resp.itemsPerPage,
-                list: resp.list.map((row: NxtOrm.NxtEntityClass) => row.getObjectToSend()),
-                nbPages: resp.nbPages,
-                nbTotal: resp.nbTotal,
-            })
+            respToSend = new NxtResponse(200, resp.getObjectToSend())
         } else if (Array.isArray(resp)) {
             respToSend = new NxtResponse(200, resp.map((row) => row instanceof NxtOrm.NxtEntityClass ? row.getObjectToSend() : row))
         } else {

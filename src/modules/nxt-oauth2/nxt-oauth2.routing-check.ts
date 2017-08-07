@@ -1,12 +1,13 @@
 import { NextFunction, Request, Response } from 'express'
 
+import { NxtInjectClass } from '../nxt-inject'
 import { NxtResponse, NxtRouteParams } from '../nxt-request'
 import * as NxtOauth2 from './'
 
-export function oauth2RoutingCheck (req: Request, res: Response, next: NextFunction, routeParams: NxtRouteParams): Promise<boolean> {
+export function oauth2RoutingCheck (req: Request, res: Response, next: NextFunction, routeParams: NxtRouteParams, nxtInjectClass: NxtInjectClass): Promise<boolean> {
     // Check if control access is needed
     if (routeParams.roleAccess && Array.isArray(routeParams.roleAccess) && routeParams.roleAccess.length) {
-        const nxtOauth2: NxtOauth2.NxtOauth2 = new NxtOauth2.NxtOauth2()
+        const nxtOauth2: NxtOauth2.NxtOauth2 = nxtInjectClass.getInstance(NxtOauth2.NxtOauth2)
 
         return nxtOauth2.getCurrentUser(req)
             .then((user: NxtOauth2.NxtOauthUser) => {

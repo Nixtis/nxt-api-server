@@ -1,14 +1,20 @@
 import { NextFunction, Request, Response } from 'express'
 
-import * as NxtRequest from '../../modules/nxt-request'
-
-import { NxtResponse } from '../../modules/nxt-request'
+import { NxtInject } from '../nxt-inject'
+import * as NxtRequest from '../nxt-request'
+import { NxtResponse } from '../nxt-request'
 
 import { NxtOauthClient } from './nxt-oauth2-client.entity'
 import { NxtOauth2 } from './nxt-oauth2.class'
 
+@NxtInject([
+    NxtOauth2,
+])
 export class NxtOauth2Service {
-    private nxtOauth2: NxtOauth2 = new NxtOauth2()
+
+    constructor (
+        private nxtOauth2: NxtOauth2,
+    ) {}
 
     /**
      * Get a new token or refresh token
@@ -56,4 +62,5 @@ export class NxtOauth2Service {
             }),
         )
     }
+
 }

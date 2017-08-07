@@ -47,9 +47,7 @@ export class NxtDb {
                 if (!err) {
                     resolve(results)
                 } else {
-                    reject()
-
-                    throw new Error(err)
+                    reject(err)
                 }
             })
         })

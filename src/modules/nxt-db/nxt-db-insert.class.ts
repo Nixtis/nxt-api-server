@@ -74,7 +74,13 @@ export class NxtDbInsert implements INxtDbQuery {
      * @returns {Promise<any>}
      */
     public execute (): Promise<any> {
-        const sqlString: string = this.toSQLString()
+        let sqlString: string = ''
+
+        try {
+            sqlString = this.toSQLString()
+        } catch (e) {
+            return Promise.reject(e)
+        }
 
         return new Promise((resolve, reject) => {
             this.db.query(sqlString, (err, rows) => {
@@ -85,9 +91,7 @@ export class NxtDbInsert implements INxtDbQuery {
                         resolve(rows)
                     }
                 } else {
-                    reject()
-
-                    throw new Error(err)
+                    reject(err)
                 }
             })
         })

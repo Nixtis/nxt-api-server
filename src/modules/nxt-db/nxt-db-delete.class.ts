@@ -45,7 +45,14 @@ export class NxtDbDelete implements INxtDbQuery {
     }
 
     public execute (): Promise<any> {
-        const sqlString: string = this.toSQLString()
+        let sqlString: string = ''
+
+        try {
+            sqlString = this.toSQLString()
+        } catch (e) {
+            return Promise.reject(e)
+        }
+
         const values: any[] = [ ...this.vals ]
 
         return new Promise((resolve, reject) => {
@@ -55,9 +62,7 @@ export class NxtDbDelete implements INxtDbQuery {
                 if (!err) {
                     resolve(rows)
                 } else {
-                    reject()
-
-                    throw new Error(err)
+                    reject(err)
                 }
             })
         })

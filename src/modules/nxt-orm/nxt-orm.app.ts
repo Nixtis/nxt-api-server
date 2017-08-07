@@ -112,7 +112,7 @@ export class NxtOrmApp {
     private handleSyncResults (sqlQueries: NxtDb.INxtDbQuery[]) {
         if (sqlQueries.length) {
             // On récupère toutes les requêtes SQL au format string
-            const sqlQueriesString: string = sqlQueries.map((sqlQuery: NxtDb.INxtDbQuery) => sqlQuery.toSQLString()).join('\n')
+            let sqlQueriesString: string = sqlQueries.map((sqlQuery: NxtDb.INxtDbQuery) => sqlQuery.toSQLString()).join('\n')
 
             if (this.params.indexOf('execute') > -1) {
                 // On le paramètre "execute" a été renseigné alors on execute les requêtes SQL
@@ -393,17 +393,15 @@ export class NxtOrmApp {
         ]
 
         const mToMForeignKeys: NxtDb.NxtDbForeignKey[] = [
-            new NxtDb.NxtDbForeignKey('id_' + eParams.table, 'fk_' + eParams.table + '_' + linkEntityParams.table + '_to_' + eParams.table, { colName: 'id', db: dbConfig.database, table: eParams.table }, NxtDb.NxtDb.CASCADE, NxtDb.NxtDb.CASCADE),
-            new NxtDb.NxtDbForeignKey('id_' + linkEntityParams.table, 'fk_' + eParams.table + '_' + linkEntityParams.table + '_to_' + linkEntityParams.table, { colName: 'id', db: dbConfig.database, table: linkEntityParams.table }, NxtDb.NxtDb.CASCADE, NxtDb.NxtDb.CASCADE),
+            new NxtDb.NxtDbForeignKey('id_' + eParams.table, 'fk_' + eParams.table + '_' + linkEntityParams.table + '_to_' + eParams.table + '_' + indexTable, { colName: 'id', db: dbConfig.database, table: eParams.table }, NxtDb.NxtDb.CASCADE, NxtDb.NxtDb.CASCADE),
+            new NxtDb.NxtDbForeignKey('id_' + linkEntityParams.table, 'fk_' + eParams.table + '_' + linkEntityParams.table + '_to_' + linkEntityParams.table + '_' + indexTable, { colName: 'id', db: dbConfig.database, table: linkEntityParams.table }, NxtDb.NxtDb.CASCADE, NxtDb.NxtDb.CASCADE),
         ]
 
-        const test = this.db.createTable()
+        return this.db.createTable()
             .setTable(eParams.table + '_' + linkEntityParams.table + '_' + indexTable)
             .setColumns(colsTable)
             .setIndexes(indexes)
             .setForeignKeys(mToMForeignKeys)
-
-        return test
     }
 
     /**
@@ -518,14 +516,17 @@ export class NxtOrmApp {
 
             const whereCombination: string[] = dbConfig.driver === 'mysql' ? [ 'table_schema', dbConfig.database ] : [ 'table_schema', 'public' ]
 
+            let where: NxtDb.NxtDbWhere = null
+            if (colParams.relation === NxtOrm.NxtOrmEnum.MANY_TO_MANY) {
+                where = new NxtDb.NxtDbWhere('?? = ?', [ 'table_name', eParams.table + '_' + linkEntityParams.table + '_' + NxtOrmApp.getRelationIndexClass(entity, propertiesNameEntity[0], NxtOrm.NxtOrmEnum.MANY_TO_MANY) ], NxtDb.NxtDbWhere.AND, [])
+            } else {
+                where = new NxtDb.NxtDbWhere('?? = ? AND ?? = ?', [ 'column_name', 'id_' + linkEntityParams.table + '_' + NxtOrmApp.getRelationIndexClass(entity, propertiesNameEntity[0], NxtOrm.NxtOrmEnum.MANY_TO_ONE), 'table_name', eParams.table ], NxtDb.NxtDbWhere.AND)
+            }
+
             return this.db.select()
                 .setTable('information_schema.columns', 'c')
                 .setWhere([
-                    new NxtDb.NxtDbWhere('?? = ?', whereCombination, NxtDb.NxtDbWhere.AND, [
-                        new NxtDb.NxtDbWhere('?? = ?', [ 'table_name', eParams.table + '_' + linkEntityParams.table ], NxtDb.NxtDbWhere.AND, [
-                            new NxtDb.NxtDbWhere('?? = ? AND ?? = ?', [ 'column_name', 'id_' + linkEntityParams.table, 'table_name', eParams.table ], NxtDb.NxtDbWhere.OR),
-                        ]),
-                    ]),
+                    new NxtDb.NxtDbWhere('?? = ?', whereCombination, NxtDb.NxtDbWhere.AND, [ where ]),
                 ])
                 .execute()
                 .then((results) => {
@@ -569,7 +570,7 @@ export class NxtOrmApp {
                                     results.push(tmpTable)
                                 }
 
-                                return propertiesNameEntity.length > 1 ? this.createColumnsIfNotExists(entity, propertiesNameEntity.slice(1), sqlQueries) : results
+                                return propertiesNameEntity.length > 1 ? this.createColumnsIfNotExists(entity, propertiesNameEntity.slice(1), results) : results
                             })
                     }
 

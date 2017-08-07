@@ -99,7 +99,14 @@ export class NxtDbUpdate implements INxtDbQuery {
      * @returns {Promise<any>}
      */
     public execute (): Promise<any> {
-        const sqlString: string = this.toSQLString()
+        let sqlString: string = ''
+
+        try {
+            sqlString = this.toSQLString()
+        } catch (e) {
+            return Promise.reject(e)
+        }
+
         const values: any[] = [ ...this.columnsValuesPair.map((col: NxtDbColumnValuePair) => col.value), ...this.vals ]
 
         return new Promise((resolve, reject) => {
@@ -109,9 +116,7 @@ export class NxtDbUpdate implements INxtDbQuery {
                 if (!err) {
                     resolve(rows)
                 } else {
-                    reject()
-
-                    throw new Error(err)
+                    reject(err)
                 }
             })
         })

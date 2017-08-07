@@ -1,5 +1,5 @@
-import * as NxtValidation from '../../modules/nxt-validation'
 import * as NxtRequest from '../nxt-request'
+import * as NxtValidation from '../nxt-validation'
 import { NxtCollectionClass } from './nxt-collection.class'
 import { NxtEntityClass } from './nxt-entity.class'
 import { NxtEntityParams, nxtGetEntity } from './nxt-entity.decorator'
@@ -27,12 +27,11 @@ export class NxtOrmRepository<T extends NxtEntityClass> {
         return 'id_' + relEntityParams.table + '_' + NxtOrmApp.getRelationIndexClass(entity, prop, NxtOrmEnum.MANY_TO_ONE)
     }
 
-    private entity
-    private db: NxtDb = new NxtDb()
-
-    constructor (entity) {
-        this.entity = entity
-    }
+    constructor (
+        private db: NxtDb,
+        private validator: NxtValidation.NxtValidator,
+        private entity,
+    ) {}
 
     public find (id: number|number[] = null, entity = this.entity, page: number = null, perPage: number = null, checkIfActive: boolean = false): Promise<T|NxtCollectionClass<T>> {
         const params: NxtEntityParams = nxtGetEntity(entity)
@@ -140,8 +139,7 @@ export class NxtOrmRepository<T extends NxtEntityClass> {
 
     public insert (entityInstance: T, entity = this.entity): Promise<T> {
         // Vérification des formulaires
-        const validator: NxtValidation.NxtValidator = new NxtValidation.NxtValidator()
-        const errors = validator.validate(entityInstance)
+        const errors = this.validator.validate(entityInstance)
 
         if (errors.length) {
             entityInstance._response = new NxtRequest.NxtResponse(NxtRequest.NxtResponse.HTTP_UNPROCESSABLE_ENTITY, {
@@ -157,41 +155,46 @@ export class NxtOrmRepository<T extends NxtEntityClass> {
 
         const propertiesNameEntity = Object.getOwnPropertyNames(entityInstance.getProps())
 
-        const colValPairs: NxtDbColumnValuePair[] = propertiesNameEntity
-            .map((prop: string) => {
-                const fieldParams: NxtFieldParams = nxtGetField(entityInstance, prop)
+        let colValPairs: NxtDbColumnValuePair[] = []
+        try {
+            colValPairs = propertiesNameEntity
+                .map((prop: string) => {
+                    const fieldParams: NxtFieldParams = nxtGetField(entityInstance, prop)
 
-                if (!fieldParams.nullable && entityInstance[prop] === null && prop !== 'id') {
-                    throw new Error('[NxtOrmRepository: insert error]: The field "' + prop + '" must be setted')
-                } else if (fieldParams.nullable && entityInstance[prop] === null) {
-                    return {
-                        column: fieldParams.name,
-                        value: null,
-                    }
-                } else if (prop !== 'id') {
-                    let value: any = entityInstance[prop]
-
-                    if (fieldParams.type === NxtOrmEnum.JSON) {
-                        value = JSON.stringify(entityInstance[prop])
-                    }
-
-                    if (fieldParams && fieldParams.name) {
+                    if (!fieldParams.nullable && entityInstance[prop] === null && prop !== 'id') {
+                        throw new Error('[NxtOrmRepository: insert error]: The field "' + prop + '" must be setted')
+                    } else if (fieldParams.nullable && entityInstance[prop] === null) {
                         return {
                             column: fieldParams.name,
-                            value,
+                            value: null,
                         }
-                    } else if (fieldParams && fieldParams.relation === NxtOrmEnum.MANY_TO_ONE && entityInstance[prop]) {
-                        const distEntityParams: NxtEntityParams = nxtGetEntity(fieldParams.type)
+                    } else if (prop !== 'id') {
+                        let value: any = entityInstance[prop]
 
-                        return {
-                            column: 'id_' + distEntityParams.table + '_' + NxtOrmApp.getRelationIndexClass(entity, prop, NxtOrmEnum.MANY_TO_ONE),
-                            value: entityInstance[prop].id,
+                        if (fieldParams.type === NxtOrmEnum.JSON) {
+                            value = JSON.stringify(entityInstance[prop])
+                        }
+
+                        if (fieldParams && fieldParams.name) {
+                            return {
+                                column: fieldParams.name,
+                                value,
+                            }
+                        } else if (fieldParams && fieldParams.relation === NxtOrmEnum.MANY_TO_ONE && entityInstance[prop]) {
+                            const distEntityParams: NxtEntityParams = nxtGetEntity(fieldParams.type)
+
+                            return {
+                                column: 'id_' + distEntityParams.table + '_' + NxtOrmApp.getRelationIndexClass(entity, prop, NxtOrmEnum.MANY_TO_ONE),
+                                value: entityInstance[prop].id,
+                            }
                         }
                     }
-                }
 
-                return null
-            }).filter((colValPair: NxtDbColumnValuePair) => colValPair !== null)
+                    return null
+                }).filter((colValPair: NxtDbColumnValuePair) => colValPair !== null)
+        } catch (e) {
+            return Promise.reject(e)
+        }
 
         return this.db.insert()
             .setTable(params.table)
@@ -225,6 +228,19 @@ export class NxtOrmRepository<T extends NxtEntityClass> {
     }
 
     public update (entityInstance: T, entity = this.entity): Promise<T> {
+        // Vérification des formulaires
+        const errors = this.validator.validate(entityInstance)
+
+        if (errors.length) {
+            entityInstance._response = new NxtRequest.NxtResponse(NxtRequest.NxtResponse.HTTP_UNPROCESSABLE_ENTITY, {
+                details: errors,
+                status: 422,
+                title: 'Unprocessable entity',
+            })
+
+            return Promise.resolve(entityInstance)
+        }
+
         const params: NxtEntityParams = nxtGetEntity(entity)
         const propertiesNameEntity = Object.getOwnPropertyNames(entityInstance)
 
@@ -340,23 +356,39 @@ export class NxtOrmRepository<T extends NxtEntityClass> {
                                     .setWhere([ new NxtDbWhere(tAlias + '.id_' + eParams.table + ' = ?', [ rows[currentIndex]['id'] ]) ])
                                     .execute()
                                     .then((results) => {
-                                        this.find(results.map((row) => row['id_' + linkEntityParams.table]), fieldParams.type)
-                                            .then((res) => {
-                                                entities[currentIndex][propertiesNameEntity[0]] = res
+                                        if (results.length) {
+                                            this.find(results.map((row) => row['id_' + linkEntityParams.table]), fieldParams.type)
+                                                .then((res) => {
+                                                    entities[currentIndex][propertiesNameEntity[0]] = res
 
-                                                if (propertiesNameEntity.slice(1).length) {
-                                                    this.setRowsToEntity(entity, rows, entities, currentIndex, propertiesNameEntity.slice(1))
-                                                        .then((results) => {
-                                                            resolve(results)
-                                                        })
-                                                } else {
-                                                    currentIndex++
-                                                    this.setRowsToEntity(entity, rows, entities, currentIndex)
-                                                        .then((results) => {
-                                                            resolve(results)
-                                                        })
-                                                }
-                                            })
+                                                    if (propertiesNameEntity.slice(1).length) {
+                                                        this.setRowsToEntity(entity, rows, entities, currentIndex, propertiesNameEntity.slice(1))
+                                                            .then((results) => {
+                                                                resolve(results)
+                                                            })
+                                                    } else {
+                                                        currentIndex++
+                                                        this.setRowsToEntity(entity, rows, entities, currentIndex)
+                                                            .then((results) => {
+                                                                resolve(results)
+                                                            })
+                                                    }
+                                                })
+                                        } else {
+                                            entities[currentIndex][propertiesNameEntity[0]] = new NxtCollectionClass()
+                                            if (propertiesNameEntity.slice(1).length) {
+                                                this.setRowsToEntity(entity, rows, entities, currentIndex, propertiesNameEntity.slice(1))
+                                                    .then((results) => {
+                                                        resolve(results)
+                                                    })
+                                            } else {
+                                                currentIndex++
+                                                this.setRowsToEntity(entity, rows, entities, currentIndex, propertiesNameEntity.slice(1))
+                                                    .then((results) => {
+                                                        resolve(results)
+                                                    })
+                                            }
+                                        }
                                     })
                                 break
                             case NxtOrmEnum.MANY_TO_ONE:
@@ -379,8 +411,8 @@ export class NxtOrmRepository<T extends NxtEntityClass> {
                                     })
                                 break
                             default:
-                                reject()
-                                throw new Error('[ENTITY: Configuration problem]: You must give a relation when type is another entity')
+                                reject(new Error('[ENTITY: Configuration problem]: You must give a relation when type is another entity'))
+                                return
                         }
                     }
                 } else {
